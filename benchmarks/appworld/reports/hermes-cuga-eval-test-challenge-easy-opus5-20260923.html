@@ -85,40 +85,26 @@
       <div class="section-head"><h2>Comparison with all Harbor runs</h2><p>Four single-attempt runs cover the exact same 24 AppWorld task IDs. All use Claude Opus 5, but the agent/runtime, prompts, tool exposure, isolation, scheduling, and accounting differ.</p></div>
       <div class="leaderboard"><div class="leader-card"><span>#1</span><strong>Harbor Claude Code</strong>
         <b>20/24</b><small>89.21% mean test pass rate</small></div><div class="leader-card"><span>#2</span><strong>Harbor OpenCode</strong>
-        <b>20/24</b><small>88.69% mean test pass rate</small></div><div class="leader-card"><span>#3</span><strong>CUGA Eval Hermes</strong>
-        <b>18/24</b><small>84.10% mean test pass rate</small></div><div class="leader-card"><span>#4</span><strong>Harbor Hermes</strong>
-        <b>17/24</b><small>82.71% mean test pass rate</small></div></div>
-      <p class="comparison-caption">Ordered by binary task success, then mean test pass rate as the tie-breaker.</p>
+        <b>20/24</b><small>88.69% mean test pass rate</small></div><div class="leader-card"><span>#3</span><strong>Harbor Hermes</strong>
+        <b>17/24</b><small>82.71% mean test pass rate</small></div><div class="leader-card"><span>#4</span><strong>CUGA Eval Hermes</strong>
+        <b>18/24</b><small>84.10% mean test pass rate</small></div></div>
+      <p class="comparison-caption">The three Harbor runs are grouped first; CUGA Eval is shown fourth. Card numbers indicate presentation order, not performance rank.</p>
       <div class="panel comparison-note"><p><strong>Outcome pattern:</strong> OpenCode and Claude Code tie at 20/24 binary successes, with Claude Code highest on partial verifier credit at 89.21%. CUGA Eval Hermes reaches 18/24 and Harbor Hermes 17/24. All four fail <code>0d22252_1</code>, <code>245cb43_1</code>, <code>5238afc_1</code>, <code>ba46d91_1</code>. The two code agents additionally solve <code>4d12842_1</code> and <code>277d81d_1</code>, while <code>9bf2c8a_1</code> fails only under Harbor Hermes.</p></div>
       <h3>Aggregate comparison</h3>
       <div class="table-wrap"><table class="results-table comparison-table"><thead><tr><th>Run</th><th>Recorded model / provider</th><th>Binary success</th><th>Mean test pass rate</th><th>Exceptions</th><th>Calls</th><th>Input</th><th>Cache read</th><th>Cache write</th><th>Output</th><th>Agent time</th><th>Wall time</th><th>Cost</th></tr></thead><tbody><tr>
-          <td><strong>CUGA Eval Hermes</strong><br><small>Hermes Agent 0.21.4</small></td>
-          <td><code>openai/aws/claude-opus-5</code><br><small>provider: OpenAI-compatible endpoint</small></td>
-          <td><strong>18/24</strong><br><small>75.00%</small></td>
-          <td><strong>84.10%</strong></td>
-          <td>5<br><small>non-zero exits</small></td>
-          <td>380</td>
-          <td>3,205,092<br><small>input and cache-read counts reported separately</small></td>
-          <td>3,037,468</td>
-          <td>171,741</td>
-          <td>80,272</td>
-          <td>38m 04s</td>
-          <td>39m 21s</td>
-          <td><strong>$15.67 estimated</strong><br><small>estimated with 0.1x cache reads and 1.25x cache writes</small></td>
-        </tr><tr>
-          <td><strong>Harbor Hermes</strong><br><small>Hermes Agent not recorded</small></td>
-          <td><code>aws/claude-opus-5</code><br><small>provider: Harbor configuration</small></td>
-          <td><strong>17/24</strong><br><small>70.83%</small></td>
-          <td><strong>82.71%</strong></td>
-          <td>5<br><small>non-zero exits</small></td>
-          <td>371</td>
-          <td>3,536,999<br><small>input and cache-read counts reported separately</small></td>
-          <td>7,971,921</td>
-          <td>182,921</td>
-          <td>75,383</td>
-          <td>47m 28s</td>
-          <td>59m 04s</td>
-          <td><strong>$18.77 estimated</strong><br><small>estimated with 0.1x cache reads and 1.25x cache writes</small></td>
+          <td><strong>Harbor Claude Code</strong><br><small>claude-code 2.1.281</small></td>
+          <td><code>aws/claude-opus-5</code><br><small>provider: anthropic</small></td>
+          <td><strong>20/24</strong><br><small>83.33%</small></td>
+          <td><strong>89.21%</strong></td>
+          <td>0<br><small>trial exceptions</small></td>
+          <td>—</td>
+          <td>44,858,780<br><small>551,485 uncached; total includes cache reads</small></td>
+          <td>44,307,295</td>
+          <td>—</td>
+          <td>160,794</td>
+          <td>1h 02m 36s</td>
+          <td>50m 48s</td>
+          <td><strong>$30.45 reported</strong><br><small>runtime-reported list-price accounting</small></td>
         </tr><tr>
           <td><strong>Harbor OpenCode</strong><br><small>opencode 1.18.32</small></td>
           <td><code>ete/aws/claude-opus-5</code><br><small>provider: ete</small></td>
@@ -134,28 +120,42 @@
           <td>59m 47s</td>
           <td><strong>$24.11 estimated</strong><br><small>estimated with cache reads at 0.1x; Harbor reported no cost</small></td>
         </tr><tr>
-          <td><strong>Harbor Claude Code</strong><br><small>claude-code 2.1.281</small></td>
-          <td><code>aws/claude-opus-5</code><br><small>provider: anthropic</small></td>
-          <td><strong>20/24</strong><br><small>83.33%</small></td>
-          <td><strong>89.21%</strong></td>
-          <td>0<br><small>trial exceptions</small></td>
-          <td>—</td>
-          <td>44,858,780<br><small>551,485 uncached; total includes cache reads</small></td>
-          <td>44,307,295</td>
-          <td>—</td>
-          <td>160,794</td>
-          <td>1h 02m 36s</td>
-          <td>50m 48s</td>
-          <td><strong>$30.45 reported</strong><br><small>runtime-reported list-price accounting</small></td>
+          <td><strong>Harbor Hermes</strong><br><small>Hermes Agent not recorded</small></td>
+          <td><code>aws/claude-opus-5</code><br><small>provider: Harbor configuration</small></td>
+          <td><strong>17/24</strong><br><small>70.83%</small></td>
+          <td><strong>82.71%</strong></td>
+          <td>5<br><small>non-zero exits</small></td>
+          <td>371</td>
+          <td>3,536,999<br><small>input and cache-read counts reported separately</small></td>
+          <td>7,971,921</td>
+          <td>182,921</td>
+          <td>75,383</td>
+          <td>47m 28s</td>
+          <td>59m 04s</td>
+          <td><strong>$18.77 estimated</strong><br><small>estimated with 0.1x cache reads and 1.25x cache writes</small></td>
+        </tr><tr>
+          <td><strong>CUGA Eval Hermes</strong><br><small>Hermes Agent 0.21.4</small></td>
+          <td><code>openai/aws/claude-opus-5</code><br><small>provider: OpenAI-compatible endpoint</small></td>
+          <td><strong>18/24</strong><br><small>75.00%</small></td>
+          <td><strong>84.10%</strong></td>
+          <td>5<br><small>non-zero exits</small></td>
+          <td>380</td>
+          <td>3,205,092<br><small>input and cache-read counts reported separately</small></td>
+          <td>3,037,468</td>
+          <td>171,741</td>
+          <td>80,272</td>
+          <td>38m 04s</td>
+          <td>39m 21s</td>
+          <td><strong>$15.67 estimated</strong><br><small>estimated with 0.1x cache reads and 1.25x cache writes</small></td>
         </tr></tbody></table></div>
       <p class="comparison-caption">The two Hermes records expose uncached input, cache reads, and cache writes separately. OpenCode and Claude Code report input totals that already include cache reads and do not expose comparable cache-write or API-call totals. OpenCode cost is an estimate using $3.80/M uncached input, 0.1× cache reads, and $19/M output; its no-cache-discount counterfactual is $188.80. Claude Code's $30.45 is runtime-reported list-price accounting. These values are not a controlled cost ranking.</p>
       <h3>Task-by-task outcomes</h3>
-      <div class="table-wrap"><table class="results-table comparison-table task-comparison"><thead><tr><th>Task</th><th>CUGA Eval Hermes</th><th>Harbor Hermes</th><th>Harbor OpenCode</th><th>Harbor Claude Code</th></tr></thead><tbody><tr><td><a href="#task-e775c78_1" class="task-link">e775c78_1</a></td>
+      <div class="table-wrap"><table class="results-table comparison-table task-comparison"><thead><tr><th>Task</th><th>Harbor Claude Code</th><th>Harbor OpenCode</th><th>Harbor Hermes</th><th>CUGA Eval Hermes</th></tr></thead><tbody><tr><td><a href="#task-e775c78_1" class="task-link">e775c78_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-07bb666_1" class="task-link">07bb666_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-9aae7da_1" class="task-link">9aae7da_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-245cb43_1" class="task-link">245cb43_1</a></td>
-        <td><span class="badge fail">FAIL</span><br><small>12.5% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td><td><span class="badge fail">FAIL</span><br><small>12.5% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge fail">FAIL</span><br><small>12.5% tests</small><br><small class="exception">AgentTimeoutError</small></td><td><span class="badge fail">FAIL</span><br><small>25.0% tests</small></td></tr><tr><td><a href="#task-4d12842_1" class="task-link">4d12842_1</a></td>
-        <td><span class="badge fail">FAIL</span><br><small>50.0% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td><td><span class="badge fail">FAIL</span><br><small>50.0% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-81be677_1" class="task-link">81be677_1</a></td>
+        <td><span class="badge fail">FAIL</span><br><small>25.0% tests</small></td><td><span class="badge fail">FAIL</span><br><small>12.5% tests</small><br><small class="exception">AgentTimeoutError</small></td><td><span class="badge fail">FAIL</span><br><small>12.5% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge fail">FAIL</span><br><small>12.5% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td></tr><tr><td><a href="#task-4d12842_1" class="task-link">4d12842_1</a></td>
+        <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge fail">FAIL</span><br><small>50.0% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge fail">FAIL</span><br><small>50.0% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td></tr><tr><td><a href="#task-81be677_1" class="task-link">81be677_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-365e0a3_1" class="task-link">365e0a3_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-ba46d91_1" class="task-link">ba46d91_1</a></td>
         <td><span class="badge fail">FAIL</span><br><small>50.0% tests</small></td><td><span class="badge fail">FAIL</span><br><small>50.0% tests</small></td><td><span class="badge fail">FAIL</span><br><small>50.0% tests</small></td><td><span class="badge fail">FAIL</span><br><small>50.0% tests</small></td></tr><tr><td><a href="#task-eb5ad85_1" class="task-link">eb5ad85_1</a></td>
@@ -163,20 +163,20 @@
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-5e27cd7_1" class="task-link">5e27cd7_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-6588a51_1" class="task-link">6588a51_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-5238afc_1" class="task-link">5238afc_1</a></td>
-        <td><span class="badge fail">FAIL</span><br><small>14.3% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td><td><span class="badge fail">FAIL</span><br><small>14.3% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge fail">FAIL</span><br><small>28.6% tests</small></td><td><span class="badge fail">FAIL</span><br><small>28.6% tests</small></td></tr><tr><td><a href="#task-9bf2c8a_1" class="task-link">9bf2c8a_1</a></td>
-        <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge fail">FAIL</span><br><small>50.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-7d26579_1" class="task-link">7d26579_1</a></td>
+        <td><span class="badge fail">FAIL</span><br><small>28.6% tests</small></td><td><span class="badge fail">FAIL</span><br><small>28.6% tests</small></td><td><span class="badge fail">FAIL</span><br><small>14.3% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge fail">FAIL</span><br><small>14.3% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td></tr><tr><td><a href="#task-9bf2c8a_1" class="task-link">9bf2c8a_1</a></td>
+        <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge fail">FAIL</span><br><small>50.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-7d26579_1" class="task-link">7d26579_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-0d22252_1" class="task-link">0d22252_1</a></td>
-        <td><span class="badge fail">FAIL</span><br><small>25.0% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td><td><span class="badge fail">FAIL</span><br><small>25.0% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge fail">FAIL</span><br><small>37.5% tests</small></td><td><span class="badge fail">FAIL</span><br><small>37.5% tests</small></td></tr><tr><td><a href="#task-3650990_1" class="task-link">3650990_1</a></td>
+        <td><span class="badge fail">FAIL</span><br><small>37.5% tests</small></td><td><span class="badge fail">FAIL</span><br><small>37.5% tests</small></td><td><span class="badge fail">FAIL</span><br><small>25.0% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge fail">FAIL</span><br><small>25.0% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td></tr><tr><td><a href="#task-3650990_1" class="task-link">3650990_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-2e9b91e_1" class="task-link">2e9b91e_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-baeb104_1" class="task-link">baeb104_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-6a5e690_1" class="task-link">6a5e690_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-f691597_1" class="task-link">f691597_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-16be9ce_1" class="task-link">16be9ce_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-277d81d_1" class="task-link">277d81d_1</a></td>
-        <td><span class="badge fail">FAIL</span><br><small>66.7% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td><td><span class="badge fail">FAIL</span><br><small>83.3% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr><tr><td><a href="#task-98d2608_1" class="task-link">98d2608_1</a></td>
+        <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge fail">FAIL</span><br><small>83.3% tests</small><br><small class="exception">NonZeroAgentExitCodeError</small></td><td><span class="badge fail">FAIL</span><br><small>66.7% tests</small><br><small class="exception">Native Hermes exited with code 1</small></td></tr><tr><td><a href="#task-98d2608_1" class="task-link">98d2608_1</a></td>
         <td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td><td><span class="badge pass">PASS</span><br><small>100.0% tests</small></td></tr></tbody></table></div>
       <div class="callout"><strong>Descriptive comparison, not a causal agent ranking</strong><p>Each cell is one attempt. The runs differ in agent implementation, prompt construction, tool access, process/container isolation, timeout behavior, concurrency, and completion plumbing. Even the usage fields have different semantics. The table shows observed outcomes and where they diverged; it does not establish why one runtime scored higher.</p></div>
-      <div class="source-note"><strong>Harbor evidence:</strong><ul><li><strong>Harbor Hermes</strong>: <code>hermes-appworld-test-challenge-easy-opus5-20260923/run-summary.json</code>; job <code>e674ed19-148c-4e17-92f8-353c99850107</code></li><li><strong>Harbor OpenCode</strong>: <code>opencode-appworld-test-challenge-easy-opus5-20260923/result.json + 24 trial result.json files</code>; job <code>028b7281-9a1c-4dfa-a619-04077fee3ac1</code></li><li><strong>Harbor Claude Code</strong>: <code>claude-code-appworld-test-challenge-easy-opus5-20260924/result.json + 24 trial result.json files</code>; job <code>f60fc93f-8c7f-44aa-a487-e30bac30e67b</code></li></ul></div>
+      <div class="source-note"><strong>Harbor evidence:</strong><ul><li><strong>Harbor Claude Code</strong>: <code>claude-code-appworld-test-challenge-easy-opus5-20260924/result.json + 24 trial result.json files</code>; job <code>f60fc93f-8c7f-44aa-a487-e30bac30e67b</code></li><li><strong>Harbor OpenCode</strong>: <code>opencode-appworld-test-challenge-easy-opus5-20260923/result.json + 24 trial result.json files</code>; job <code>028b7281-9a1c-4dfa-a619-04077fee3ac1</code></li><li><strong>Harbor Hermes</strong>: <code>hermes-appworld-test-challenge-easy-opus5-20260923/run-summary.json</code>; job <code>e674ed19-148c-4e17-92f8-353c99850107</code></li></ul></div>
     </section>
 
     <section class="section" id="cost">

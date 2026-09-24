@@ -484,12 +484,16 @@ def optional_int(value: Any) -> str:
 def harbor_comparison(results: list[dict[str, Any]], harbor_runs: list[dict[str, Any]]) -> str:
     if not harbor_runs:
         return ""
-    runs = [cuga_comparison_run(results), *harbor_runs]
-    ranked = sorted(runs, key=lambda run: (run["successes"], run["mean_test_pass_rate"]), reverse=True)
+    ordered_harbor_runs = sorted(
+        harbor_runs,
+        key=lambda run: (run["successes"], run["mean_test_pass_rate"]),
+        reverse=True,
+    )
+    runs = [*ordered_harbor_runs, cuga_comparison_run(results)]
     leaderboard = "".join(
         f"""<div class="leader-card"><span>#{rank}</span><strong>{esc(run['label'])}</strong>
         <b>{run['successes']}/24</b><small>{run['mean_test_pass_rate'] * 100:.2f}% mean test pass rate</small></div>"""
-        for rank, run in enumerate(ranked, 1)
+        for rank, run in enumerate(runs, 1)
     )
     aggregate_rows = "".join(
         f"""<tr>
@@ -523,13 +527,13 @@ def harbor_comparison(results: list[dict[str, Any]], harbor_runs: list[dict[str,
     common_list = ", ".join(f"<code>{esc(item)}</code>" for item in sorted(common_failures))
     source_items = "".join(
         f"<li><strong>{esc(run['label'])}</strong>: <code>{esc(run['source'])}</code>; job <code>{esc(run['job_id'])}</code></li>"
-        for run in harbor_runs
+        for run in ordered_harbor_runs
     )
     return f"""
     <section class="section" id="comparison">
       <div class="section-head"><h2>Comparison with all Harbor runs</h2><p>Four single-attempt runs cover the exact same 24 AppWorld task IDs. All use Claude Opus 5, but the agent/runtime, prompts, tool exposure, isolation, scheduling, and accounting differ.</p></div>
       <div class="leaderboard">{leaderboard}</div>
-      <p class="comparison-caption">Ordered by binary task success, then mean test pass rate as the tie-breaker.</p>
+      <p class="comparison-caption">The three Harbor runs are grouped first; CUGA Eval is shown fourth. Card numbers indicate presentation order, not performance rank.</p>
       <div class="panel comparison-note"><p><strong>Outcome pattern:</strong> OpenCode and Claude Code tie at 20/24 binary successes, with Claude Code highest on partial verifier credit at 89.21%. CUGA Eval Hermes reaches 18/24 and Harbor Hermes 17/24. All four fail {common_list}. The two code agents additionally solve <code>4d12842_1</code> and <code>277d81d_1</code>, while <code>9bf2c8a_1</code> fails only under Harbor Hermes.</p></div>
       <h3>Aggregate comparison</h3>
       <div class="table-wrap"><table class="results-table comparison-table"><thead><tr><th>Run</th><th>Recorded model / provider</th><th>Binary success</th><th>Mean test pass rate</th><th>Exceptions</th><th>Calls</th><th>Input</th><th>Cache read</th><th>Cache write</th><th>Output</th><th>Agent time</th><th>Wall time</th><th>Cost</th></tr></thead><tbody>{aggregate_rows}</tbody></table></div>
