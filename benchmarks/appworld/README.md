@@ -58,7 +58,8 @@ git lfs install
 The `setup_appworld.sh` script:
 - Loads [`config/appworld.env`](config/appworld.env)
 - Clones [`https://github.com/StonyBrookNLP/appworld`](https://github.com/StonyBrookNLP/appworld) into [`benchmarks/appworld/appworld`](appworld) if not already present
-- Runs `uv add --editable --no-workspace benchmarks/appworld/appworld --group appworld`, which writes a `[tool.uv.sources]` entry and a `[dependency-groups].appworld` entry into your **local** `pyproject.toml` and installs the package editable
+- Checks out the pinned AppWorld revision `42b5bcf3cd334fee33f0c37c02070a9f5807add5`
+- Runs `uv add --editable 'benchmarks/appworld/appworld[mcp]' --group appworld` (plus `--no-workspace` on older `uv` releases that support it), which writes a `[tool.uv.sources]` entry and a `[dependency-groups].appworld` entry into your **local** `pyproject.toml` and installs the package editable with its MCP server extra
 - Runs `appworld install --repo` and `appworld download data` from inside the clone
 
 If [`benchmarks/appworld/appworld/data`](appworld/data) already exists, you'll be prompted before re-downloading.
@@ -76,6 +77,18 @@ uv sync                    # base deps only (AppWorld is removed from venv;
 ```
 
 Both forms succeed regardless of whether the appworld clone exists. The `appworld` group is opt-in, so running other benchmarks (BPO, M3, Oak) never requires AppWorld to be installed.
+
+### 5. Install native Hermes (only for `--agent hermes`)
+
+```bash
+./benchmarks/appworld/setup_hermes.sh
+```
+
+This installs the real NousResearch Hermes Agent at pinned revision
+`d6c9fb8ee8f54bc88897685ba422a60af2ecfab2` in the ignored
+`benchmarks/appworld/hermes-agent/` directory. It uses an isolated virtual
+environment so Hermes dependencies cannot conflict with CUGA's environment.
+
 ---
 
 ## 🚀 Running the Benchmark
@@ -89,26 +102,32 @@ AppWorld supports multiple agent backends via `--agent`:
 - **`cuga`** (default) — `CugaAgent` SDK path (`eval_appworld_sdk.py`) with `CombinedToolProvider` MCP tools
 - **`deepagents`** — [LangChain Deep Agents](https://docs.langchain.com/oss/python/deepagents/overview) with the same registry LangChain tools
 - **`openclaw`** — OpenClaw agent with LangChain tool bridge
-- **`hermes`** — Hermes client with ReAct tool loop over registry tools
+- **`hermes`** — real NousResearch Hermes Agent subprocess with native MCP tool discovery
 - **`stub`** — the template in `agents/stub.py`; a plain chat model on the shared tool loop. Not a framework — run it to check the harness, or copy it to add your own
 - **`react`** — pre-PR-31 baseline: `appworld_eval_react.py` (Python REPL via `world.execute()`)
 - **`codeact`** — `appworld_eval_codeact.py` with richer in-code workflow logic
 
 ### What the external agents share with CUGA, and what they do not
 
-The external agents (`deepagents`, `openclaw`, `hermes`, `stub`) get their tools from
-the same `CombinedToolProvider` against the same registry as the CUGA SDK path, and
-reach it through the same `get_registry_base_url` / `authenticate_apps` helpers.
-`tests/test_tool_provider_parity.py` asserts that and fails if an adapter starts
-building its own tool list.
+The LangChain external adapters (`deepagents`, `openclaw`, `stub`) get their tools
+from the same `CombinedToolProvider` against the same registry as the CUGA SDK
+path. `tests/test_tool_provider_parity.py` pins that shared path.
+
+Hermes is intentionally different: `eval.sh` starts AppWorld's native HTTP MCP
+server, and the real Hermes CLI connects to it as the `appworld` toolset. Hermes
+receives all AppWorld apps and performs its own tool discovery through
+`tool_search`, `tool_describe`, and `tool_call`; it does not run CUGA's LangChain
+ReAct loop or receive a task-filtered tool list. The server uses AppWorld's
+`content_only` MCP output mode for compatibility with Hermes's MCP client.
 
 Three differences are real and deliberate. Read any score comparison with them in mind:
 
-| | CUGA SDK path | External agents |
-|---|---|---|
-| Apps loaded | all apps; the agent locates tools itself via `find_tools` | only the apps the task declares, so cross-app tool selection is already solved |
-| System prompt | `APPWORLD_SDK_PROMPT` | `APPWORLD_AGENT_PROMPT` — same base, plus explicit filtering and pagination rules, which CUGA handles in code rather than in the prompt |
-| LLM client | `LLMManager` with CUGA's resolved model settings | `create_eval_llm`, which reads `AGENT_SETTING_CONFIG` + `MODEL_NAME` directly and supports only `settings.groq.toml` and `settings.openai.toml` |
+| | CUGA SDK path | LangChain external adapters | Native Hermes |
+|---|---|---|---|
+| Tool transport | CUGA registry and `CombinedToolProvider` | same registry/provider | AppWorld native MCP over HTTP |
+| Apps loaded | all apps; CUGA locates tools via `find_tools` | only task-declared apps | all apps; Hermes discovers tools through MCP |
+| Agent runtime | in-process `CugaAgent` | in-process adapter/shared loop | isolated `hermes --yolo chat` subprocess |
+| LLM configuration | CUGA `LLMManager` | `create_eval_llm` from eval settings | native Hermes OpenAI-compatible provider config |
 
 Both prompts live in `agents/base.py`, next to each other, so the gap shows up in a diff.
 
@@ -131,9 +150,10 @@ cp benchmarks/appworld/agents/stub.py benchmarks/appworld/agents/myagent.py
 ```
 
 If `--agent stub` scores and yours does not, the problem is in your adapter, not the
-harness. Keep tools coming from `setup_appworld_tools` and keep returning an
-`AppWorldInvokeResult` — the parity test enforces the first, and the evaluator reads
-`answer` and `tool_calls` off the second.
+harness. For an in-process adapter, keep tools coming from `setup_appworld_tools`
+and return an `AppWorldInvokeResult`. Native subprocess agents such as Hermes may
+use their own protocol boundary, but must still return `AppWorldInvokeResult` so
+the evaluator can record answers, tool calls, metrics, and artifacts.
 
 ### External Agent Dependencies
 
@@ -146,7 +166,9 @@ uv sync --group appworld --group deepagents
 uv sync --group appworld --group openclaw
 ```
 
-Hermes (`pip install hermes`) conflicts with CUGA's `litellm` dependency (`jsonschema` version mismatch). The Hermes adapter falls back to the eval LLM (same as CUGA) when the native client is unavailable — install Hermes only if you need the native client in an isolated environment.
+Do not install the unrelated PyPI `hermes` package into the CUGA environment.
+Use `./benchmarks/appworld/setup_hermes.sh` for the pinned NousResearch Hermes
+Agent and its isolated virtual environment.
 
 ### Smoke test (no CUGA, no AppWorld servers)
 
@@ -162,25 +184,28 @@ Verify external agents can reach your LLM before running full AppWorld evals:
 # 2. Install Deep Agents SDK (optional groups for openclaw)
 uv sync --group deepagents
 
-# 3. Run smoke test (uses eval LLM for all three; no registry/AppWorld)
+# 3. Run smoke test for in-process adapters (no registry/AppWorld)
 ./benchmarks/appworld/smoke_external.sh
 
 # Single agent
 ./benchmarks/appworld/smoke_external.sh --agents stub,deepagents
 
-# Try native OpenClaw/Hermes SDKs instead of eval LLM
+# Try a native OpenClaw SDK instead of its eval-LLM bridge
 ./benchmarks/appworld/smoke_external.sh --native-sdk
 ```
 
-Pass criteria: direct LLM check returns `OK`, each agent calls the `ping` tool and answers `Final Answer: success`.
+Pass criteria: direct LLM check returns `OK`, and each selected in-process agent
+calls the `ping` tool and answers `Final Answer: success`. Native Hermes is tested
+with a real single AppWorld task because its boundary is AppWorld MCP, not the
+in-process mock tool.
 
 Required API keys (set in `.env` at repo root):
 
 | Agent | Environment variables |
 |---|---|
-| CUGA / Deep Agents / Hermes (via eval LLM) | `OPENAI_API_KEY` or `GROQ_API_KEY` (per `AGENT_SETTING_CONFIG`) |
+| CUGA / Deep Agents | `OPENAI_API_KEY` or `GROQ_API_KEY` (per `AGENT_SETTING_CONFIG`) |
 | OpenClaw | `OPENCLAW_API_KEY` |
-| Hermes (native client) | Hermes provider key from `hermes setup` |
+| Hermes (native agent) | `OPENAI_API_KEY` and `OPENAI_BASE_URL` for the configured OpenAI-compatible endpoint |
 
 Both share the same harness (Python REPL via `world.execute()` with variables persisting across steps) for `react`/`codeact`, so the mechanism is identical. The ReAct vs CodeAct distinction here is about **where decisions live**: with the `react` prompt the model makes decisions between turns (ReAct-flavored), with the `codeact` prompt the model embeds branching, iteration, and error handling directly in code (true CodeAct). `--agent codeact` also adds engineering improvements over the baseline: stop sequences on the closing code fence, a larger trim budget, and pre-authentication of all task apps. `--agent codeact` is only supported by AppWorld; other benchmarks reject it with a clear error.
 
@@ -204,6 +229,7 @@ Both share the same harness (Python REPL via `world.execute()` with variables pe
 
 # Run with OpenClaw or Hermes
 ./benchmarks/appworld/eval.sh --agent openclaw --eval-key test_challenge_easy
+./benchmarks/appworld/setup_hermes.sh
 ./benchmarks/appworld/eval.sh --agent hermes --eval-key test_challenge_easy
 
 # Run with a specific model profile

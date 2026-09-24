@@ -150,21 +150,89 @@ async def test_deepagents_adapter_invoke():
 
 
 @pytest.mark.asyncio
-async def test_hermes_adapter_uses_tool_loop():
-    tools = [_MockTool("t1")]
+async def test_hermes_adapter_runs_native_cli_and_parses_session(tmp_path, monkeypatch):
+    import json
 
-    with patch(
-        "benchmarks.appworld.agents.hermes.run_tool_react_loop",
-        new_callable=AsyncMock,
-        return_value=AppWorldInvokeResult(answer="hermes done", react_steps=2),
-    ) as mock_loop:
-        from benchmarks.appworld.agents.hermes import HermesAppWorldAgent
+    from benchmarks.appworld.agents.hermes import HermesAppWorldAgent
 
-        agent = HermesAppWorldAgent(tools=tools)
-        result = await agent.invoke(intent="task", thread_id="t1", user_context="ctx")
+    binary = tmp_path / "hermes"
+    binary.touch()
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setenv("OPENAI_BASE_URL", "https://example.test/v1")
 
-    mock_loop.assert_awaited_once()
-    assert result.answer == "hermes done"
+    session = {
+        "id": "session-1",
+        "started_at": 10,
+        "input_tokens": 100,
+        "output_tokens": 20,
+        "cache_read_tokens": 50,
+        "cache_write_tokens": 10,
+        "api_call_count": 2,
+        "messages": [
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call-1",
+                        "function": {"name": "tool_call", "arguments": '{"calls": []}'},
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call-1", "content": "ok"},
+            {
+                "role": "assistant",
+                "tool_calls": [
+                    {
+                        "id": "call-2",
+                        "function": {
+                            "name": "tool_call",
+                            "arguments": json.dumps(
+                                {
+                                    "calls": [
+                                        {
+                                            "name": "mcp__appworld__supervisor__complete_task",
+                                            "arguments": {"status": "success", "answer": "15"},
+                                        }
+                                    ]
+                                }
+                            ),
+                        },
+                    }
+                ],
+            },
+            {"role": "tool", "tool_call_id": "call-2", "content": "ok"},
+            {"role": "assistant", "content": "15 with extra explanation"},
+        ],
+    }
+
+    async def fake_process(*args, cwd, env, timeout):
+        del cwd, env, timeout
+        if args[0] == "sessions":
+            from pathlib import Path
+
+            Path(args[2]).write_text(json.dumps(session) + "\n", encoding="utf-8")
+            return 0, "exported"
+        assert args[:2] == ("--yolo", "chat")
+        assert args[args.index("--toolsets") + 1] == "appworld"
+        assert args[args.index("--max-turns") + 1] == "25"
+        return 0, "session_id: session-1\n15\n"
+
+    agent = HermesAppWorldAgent(
+        tools=[_MockTool("ignored")],
+        hermes_binary=binary,
+        runs_dir=tmp_path / "runs",
+    )
+    agent._run_process = AsyncMock(side_effect=fake_process)
+    result = await agent.invoke(intent="count emails", thread_id="t1", user_context="ctx")
+
+    assert result.answer == "15"
+    assert result.react_steps == 3
+    assert [call["name"] for call in result.tool_calls] == ["tool_call", "tool_call"]
+    assert result.metrics["total_tokens"] == 120
+    assert result.metrics["total_llm_calls"] == 2
+    run_config = json.loads((tmp_path / "runs" / "t1" / "home" / "config.yaml").read_text())
+    assert run_config["toolsets"] == ["appworld"]
+    assert run_config["mcp_servers"]["appworld"]["url"].endswith("/mcp/")
 
 
 def test_factory_unknown_agent_raises():

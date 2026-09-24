@@ -3,11 +3,11 @@
 Two prompts live here, side by side and on purpose.
 
 ``APPWORLD_SDK_PROMPT`` is what ``eval_appworld_sdk.py`` passes to the CUGA SDK.
-``APPWORLD_AGENT_PROMPT`` is what the external adapters pass to their agent.
-They are not identical, and they cannot be: CUGA has ``find_tools`` and a Python
-sandbox, so its prompt can refer to both, while the external adapters run a
-plain tool loop over a fixed tool list and need explicit filtering and
-pagination rules that CUGA's graph already handles in code.
+``APPWORLD_AGENT_PROMPT`` is the common prompt for external adapters. They are
+not identical, and they cannot be: CUGA has ``find_tools`` and a Python sandbox,
+while external runtimes need explicit filtering and pagination rules that
+CUGA's graph already handles in code. LangChain adapters receive a fixed tool
+list; native adapters may extend this prompt for their own discovery protocol.
 
 Keeping them in one file makes that gap visible in a diff. When you change one,
 read the other and decide deliberately whether the change applies to it too.
@@ -37,10 +37,10 @@ B. App-specific instructions:
 - For temporal requests, use proper time boundaries, e.g., when asked about periods like "yesterday", use complete ranges: 00:00:00 to 23:59:59.
         """
 
-# Passed to the external adapters (deepagents / openclaw / hermes). Derived from
-# APPWORLD_SDK_PROMPT, with sections B and C added: those agents have no
-# equivalent of CUGA's pagination and filter handling, so the rules have to be
-# stated in the prompt instead.
+# Passed to the external adapters (deepagents / openclaw / Hermes). Derived from
+# APPWORLD_SDK_PROMPT, with sections B and C added: those runtimes do not share
+# CUGA's pagination and filter handling, so the rules have to be stated in the
+# prompt instead. Native Hermes extends it with MCP completion instructions.
 APPWORLD_AGENT_PROMPT = """
 # INSTRUCTIONS
 
@@ -79,6 +79,8 @@ class AppWorldInvokeResult:
     tool_calls: list[dict[str, Any]] = field(default_factory=list)
     react_steps: int | None = None
     error: str | None = None
+    metrics: dict[str, Any] = field(default_factory=dict)
+    artifacts: dict[str, str] = field(default_factory=dict)
 
 
 @runtime_checkable

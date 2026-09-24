@@ -104,14 +104,11 @@ deepagents = [
     "deepagents>=0.6",
 ]
 
-# No `openclaw` or `hermes` extra. `openclaw>=2026.3` does not exist on PyPI
-# (the name resolves to an unrelated package capped at 2.0.2) and PyPI `hermes`
-# pins jsonschema<4, which conflicts with cuga/litellm. Declaring either made
-# `uv lock` fail outright for the whole project, not just for that extra.
-# Both adapters import their client lazily and raise an install hint when it is
-# absent, and both fall back to the shared eval LLM, so `--agent openclaw` and
-# `--agent hermes` still run without the package. Install a real client into a
-# separate venv if you have one.
+# No `openclaw` or `hermes` dependency here. `openclaw>=2026.3` does not exist
+# on PyPI (the name resolves to an unrelated package capped at 2.0.2). The real
+# NousResearch Hermes Agent is installed from a pinned Git revision into its own
+# venv by `benchmarks/appworld/setup_hermes.sh`; keeping it isolated avoids its
+# dependency graph colliding with CUGA's. OpenClaw still uses the eval-LLM bridge.
 appworld-agents = [
     "deepagents>=0.6",
 ]

@@ -33,6 +33,7 @@ for arg in "$@"; do
         echo "  --bundle-zip                 Create zip archive of bundle"
         echo "  --model-profile <name>       Model profile (for bundle metadata)"
         echo "  --agent <name>               Agent to run (cuga, react, codeact, deepagents, openclaw, hermes, stub; default: cuga)"
+        echo "  --hermes-max-turns <n>       Native Hermes turn cap (default: 25)"
         echo "  --eval-key <key>             Task group key in eval_config.toml (e.g. test_med); recorded in bundle metadata"
         echo "  --leaderboard <prefix>       Tag this run for official AppWorld leaderboard submission (implies --sdk)"
         echo "  --force-retry                Re-run listed tasks even if a clean partial already exists"
@@ -51,6 +52,7 @@ for arg in "$@"; do
 done
 
 APPWORLD_PID=""
+APPWORLD_NATIVE_MCP_PID=""
 REGISTRY_PID=""
 APPWORLD_MCP_EXPANDED=""
 
@@ -169,10 +171,18 @@ cleanup() {
             kill "$REGISTRY_PID" 2>/dev/null || true
             wait "$REGISTRY_PID" 2>/dev/null || true
         fi
+        if [ -n "$APPWORLD_NATIVE_MCP_PID" ] && kill -0 "$APPWORLD_NATIVE_MCP_PID" 2>/dev/null; then
+            echo -e "${BLUE:-}Stopping AppWorld MCP (PID: $APPWORLD_NATIVE_MCP_PID)${NC:-}"
+            kill "$APPWORLD_NATIVE_MCP_PID" 2>/dev/null || true
+            wait "$APPWORLD_NATIVE_MCP_PID" 2>/dev/null || true
+        fi
         # Killing $APPWORLD_PID does not reap its server children (`appworld
         # serve env` / `appworld serve apis` — the latter observed listening on
         # 9111 hours after its parent died, #148). Reap by port as a backstop.
-        kill_port_processes "$APPWORLD_ENV_PORT" "$APPWORLD_APIS_PORT"
+        kill_port_processes "${APPWORLD_ENV_PORT:-8000}" "${APPWORLD_APIS_PORT:-9111}"
+        if [ -n "$APPWORLD_NATIVE_MCP_PID" ]; then
+            kill_port_processes "${APPWORLD_MCP_PORT:-10000}"
+        fi
     fi
     # RUN_MARKER (if created) is only used up to the LATEST_RESULT lookup right
     # after the evaluator exits; clean it up here instead of a dedicated trap so
@@ -202,6 +212,19 @@ export DYNACONF_SERVER_PORTS__ENVIRONMENT_URL="$APPWORLD_ENV_PORT"
 APPWORLD_APIS_PORT="${APPWORLD_APIS_PORT:-${DYNACONF_SERVER_PORTS__APIS_URL:-9111}}"
 export APPWORLD_APIS_PORT
 export DYNACONF_SERVER_PORTS__APIS_URL="$APPWORLD_APIS_PORT"
+APPWORLD_MCP_PORT="${APPWORLD_MCP_PORT:-10000}"
+export APPWORLD_MCP_PORT
+export APPWORLD_MCP_URL="${APPWORLD_MCP_URL:-http://127.0.0.1:${APPWORLD_MCP_PORT}/mcp/}"
+
+if [ "${AGENT:-cuga}" = "hermes" ]; then
+    HERMES_BIN="${APPWORLD_HERMES_BIN:-$SCRIPT_DIR/hermes-agent/venv/bin/hermes}"
+    if [ ! -x "$HERMES_BIN" ]; then
+        echo "Error: native Hermes is not installed at $HERMES_BIN" >&2
+        echo "Run ./benchmarks/appworld/setup_hermes.sh first." >&2
+        exit 1
+    fi
+    export APPWORLD_HERMES_BIN="$HERMES_BIN"
+fi
 
 # Per-run token/timing receipt from CugaAgent.invoke() (cuga-agent#467).
 # Only the --sdk evaluator (eval_appworld_sdk.py) calls agent.invoke() and can
@@ -253,6 +276,9 @@ if [ "${SKIP_SERVER_START:-false}" != "true" ]; then
     }
     reap_unresponsive_port "$APPWORLD_ENV_PORT" "http://127.0.0.1:$APPWORLD_ENV_PORT/" "AppWorld"
     reap_unresponsive_port "$APPWORLD_APIS_PORT" "http://127.0.0.1:$APPWORLD_APIS_PORT/" "AppWorld API server"
+    if [ "${AGENT:-cuga}" = "hermes" ]; then
+        reap_unresponsive_port "$APPWORLD_MCP_PORT" "$APPWORLD_MCP_URL" "AppWorld MCP server"
+    fi
 
     # Start AppWorld
     echo -e "${YELLOW:-}Starting AppWorld...${NC:-}"
@@ -277,6 +303,29 @@ if [ "${SKIP_SERVER_START:-false}" != "true" ]; then
         echo -e "${RED:-}Error: AppWorld API server failed to start${NC:-}"
         cat /tmp/appworld.log | tail -20
         exit 1
+    fi
+
+    # Real Hermes connects to AppWorld's native all-app MCP server. This is a
+    # distinct protocol surface from CUGA's registry-backed LangChain tools.
+    if [ "${AGENT:-cuga}" = "hermes" ]; then
+        if curl -s --max-time 5 "$APPWORLD_MCP_URL" > /dev/null 2>&1; then
+            echo -e "${GREEN:-}✓${NC:-} Reusing AppWorld MCP server at $APPWORLD_MCP_URL"
+        else
+            echo -e "${YELLOW:-}Starting AppWorld MCP server (all apps)...${NC:-}"
+            uv run --no-sync python -m appworld.cli serve mcp http \
+                --port "$APPWORLD_MCP_PORT" \
+                --output-type content_only \
+                --remote-apis-url "http://127.0.0.1:$APPWORLD_APIS_PORT" \
+                --root "$SCRIPT_DIR/appworld" > /tmp/appworld_mcp.log 2>&1 &
+            APPWORLD_NATIVE_MCP_PID=$!
+            if wait_for_server "$APPWORLD_MCP_URL" "AppWorld MCP server" 90; then
+                echo -e "${GREEN:-}✓${NC:-} AppWorld MCP ready (PID: $APPWORLD_NATIVE_MCP_PID)"
+            else
+                echo -e "${RED:-}Error: AppWorld MCP server failed to start${NC:-}"
+                tail -20 /tmp/appworld_mcp.log
+                exit 1
+            fi
+        fi
     fi
 
     # Kill any stale process on the registry port before starting
@@ -392,6 +441,7 @@ if [ -n "$LATEST_RESULT" ] && [ "${NO_BUNDLE:-false}" != "true" ]; then
             FIN_EXTRA+=(--trajectory-dir "$TRAJ_DIR")
         fi
         FIN_EXTRA+=(--log-file /tmp/appworld.log --log-file /tmp/appworld_registry.log --log-file "$CONSOLE_LOG")
+        [ -f /tmp/appworld_mcp.log ] && FIN_EXTRA+=(--log-file /tmp/appworld_mcp.log)
         finalize_experiment_workspace "appworld" "${FIN_EXTRA[@]}"
 
         # Run AFTER finalize: finalize_workspace_bundle regenerates
@@ -442,6 +492,7 @@ if [ -n "$LATEST_RESULT" ] && [ "${NO_BUNDLE:-false}" != "true" ]; then
         fi
         # Include server and console logs
         BUNDLE_ARGS+=(--log-files /tmp/appworld.log /tmp/appworld_registry.log "$CONSOLE_LOG")
+        [ -f /tmp/appworld_mcp.log ] && BUNDLE_ARGS+=(--log-files /tmp/appworld_mcp.log)
         # Download Langfuse traces if available
         BUNDLE_ARGS+=(--fetch-langfuse)
         BUNDLE_OUT=$(uv run --no-sync python -m benchmarks.helpers.bundle "${BUNDLE_ARGS[@]}" 2>&1 | tee /dev/stderr)

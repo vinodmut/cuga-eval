@@ -1,10 +1,7 @@
 # Quick start: add your agent to the AppWorld comparison
 
-**Branch:** `feat/appworld-external-agent-comparison` (PR #100). Not on `main` yet.
-
 ```bash
 git clone git@github.com:cuga-project/cuga-eval.git && cd cuga-eval
-git checkout feat/appworld-external-agent-comparison
 ./setup_appworld.sh
 uv sync --all-extras
 cp .env.example .env
@@ -41,7 +38,7 @@ Read that file's docstring — it is the full instructions. You replace **one me
 - `agents/factory.py` — `EXTERNAL_AGENT_NAMES` and a branch in `create_appworld_agent`
 - `eval.sh` — `is_external_agent()`
 
-Do not change these; they are what makes the comparison fair:
+For an in-process adapter, keep these contracts:
 
 | | |
 |---|---|
@@ -51,6 +48,12 @@ Do not change these; they are what makes the comparison fair:
 
 Pass `invoke_callbacks` through to whatever calls your model. They carry the token
 counter, and dropping them silently zeroes your cost column.
+
+A native subprocess agent may need a different tool transport. The real Hermes
+adapter is the concrete example: it launches a pinned NousResearch Hermes Agent,
+connects it to AppWorld's all-app HTTP MCP server, exports the native Hermes
+session, and converts that session into `AppWorldInvokeResult`. It does not use
+the shared LangChain ReAct loop.
 
 ## 3. Run and compare
 
@@ -62,9 +65,9 @@ uv run pytest benchmarks/appworld/tests/ -q
 
 ## 4. Read the numbers honestly
 
-Both sides get tools from the same `CombinedToolProvider` against the same registry
-(`tests/test_tool_provider_parity.py` enforces it). Three differences remain, and all
-three favour your agent:
+For LangChain adapters, both sides reach tools through `CombinedToolProvider`
+against the same registry (`tests/test_tool_provider_parity.py` enforces it).
+Three differences remain:
 
 | | CUGA | Yours |
 |---|---|---|
@@ -74,6 +77,16 @@ three favour your agent:
 
 Both prompts sit side by side in `agents/base.py` so the gap shows in a diff.
 
-`--compare-agents` expands to `cuga,deepagents,openclaw,hermes`, but `openclaw` and
-`hermes` have no installable client and both fall back to the shared eval LLM — so
-they are three runs of the same loop, not three frameworks.
+`--compare-agents` expands to `cuga,deepagents,openclaw,hermes`. `openclaw` uses
+the eval-LLM bridge by default. `hermes` is the actual NousResearch agent and must
+be installed separately:
+
+```bash
+./benchmarks/appworld/setup_hermes.sh
+./benchmarks/appworld/eval.sh --agent hermes --task 82e2fac_1
+```
+
+The Hermes run is not strict transport parity with CUGA: both receive all
+AppWorld apps, but CUGA uses its registry-backed SDK integration and Hermes uses
+AppWorld's native MCP server. The result report records Hermes's native token,
+turn, cost, and session-artifact metadata.

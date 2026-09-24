@@ -94,7 +94,7 @@ async def invoke_and_score_appworld_agent(
             invoke_result_holder.clear()
             invoke_result_holder.append(invoke_result)
             raw_response = invoke_result.answer
-            if _uses_cuga_invoke(agent):
+            if _uses_cuga_invoke(agent) or getattr(agent, "provides_final_answer", False):
                 response = raw_response
             else:
                 response = await maybe_format_appworld_final_answer(
@@ -212,6 +212,16 @@ async def invoke_and_score_appworld_agent(
     }
 
     apply_token_metrics(result, token_callback, _langfuse_metrics)
+
+    # A subprocess agent cannot call this process's LangChain callbacks. Its
+    # exported native session is therefore the authoritative usage receipt.
+    if invoke_result_holder:
+        native_metrics = getattr(invoke_result_holder[0], "metrics", None)
+        if native_metrics:
+            result.update(native_metrics)
+        artifacts = getattr(invoke_result_holder[0], "artifacts", None)
+        if artifacts:
+            result["artifacts"] = artifacts
 
     agent_steps = None
     if invoke_result_holder:

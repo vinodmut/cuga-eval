@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Smoke-test external agents (stub, deepagents, openclaw, hermes) against configured LLM.
+"""Smoke-test in-process external agents against the configured LLM.
 
 No CUGA agent, no AppWorld servers, no MCP registry — only verifies that each
 adapter can call the model from .env (AGENT_SETTING_CONFIG + MODEL_NAME + keys).
+Native Hermes is excluded because it requires a live AppWorld MCP server; use a
+single-task ``eval.sh --agent hermes`` run to smoke-test it.
 """
 
 from __future__ import annotations
@@ -47,6 +49,8 @@ SMOKE_INTENT = (
     "After you see the tool result, respond with exactly: Final Answer: success"
 )
 
+SMOKE_AGENT_NAMES = EXTERNAL_AGENT_NAMES - {"hermes"}
+
 
 def _validate_llm_env() -> None:
     setting = os.getenv("AGENT_SETTING_CONFIG", "").strip()
@@ -90,7 +94,7 @@ async def smoke_agent(
 ) -> dict:
     tools = [ping]
     kwargs: dict = {"max_steps": max_steps, "system_prompt": SMOKE_SYSTEM_PROMPT}
-    if agent_name in ("openclaw", "hermes"):
+    if agent_name == "openclaw":
         kwargs["prefer_eval_llm"] = prefer_eval_llm
 
     agent = create_appworld_agent(agent_name, tools=tools, **kwargs)
@@ -128,19 +132,22 @@ async def smoke_agent(
 
 async def main() -> int:
     parser = argparse.ArgumentParser(
-        description="Smoke-test stub/deepagents/openclaw/hermes against configured LLM (no CUGA/AppWorld)"
+        description="Smoke-test stub/deepagents/openclaw against configured LLM (no CUGA/AppWorld)"
     )
     parser.add_argument(
         "--agents",
         # `stub` first: it is the cheapest check that LLM config and the tool
         # loop both work, so a failure there explains the others.
-        default="stub,deepagents,openclaw,hermes",
-        help=f"Comma-separated agents (default: stub,deepagents,openclaw,hermes). Choices: {', '.join(sorted(EXTERNAL_AGENT_NAMES))}",
+        default="stub,deepagents,openclaw",
+        help=(
+            "Comma-separated agents (default: stub,deepagents,openclaw). "
+            f"Choices: {', '.join(sorted(SMOKE_AGENT_NAMES))}"
+        ),
     )
     parser.add_argument(
         "--native-sdk",
         action="store_true",
-        help="Try OpenClaw/Hermes native SDK (default: use eval LLM only)",
+        help="Try an OpenClaw native SDK (default: use eval LLM only)",
     )
     parser.add_argument(
         "--skip-llm-check",
@@ -159,9 +166,12 @@ async def main() -> int:
         return 1
 
     agent_names = [a.strip().lower() for a in args.agents.split(",") if a.strip()]
-    unknown = set(agent_names) - EXTERNAL_AGENT_NAMES
+    unknown = set(agent_names) - SMOKE_AGENT_NAMES
     if unknown:
-        logger.error(f"Unknown agents: {unknown}")
+        logger.error(
+            f"Unsupported smoke agents: {unknown}. Native Hermes requires a live "
+            "AppWorld MCP server; use eval.sh --agent hermes --task <task-id>."
+        )
         return 1
 
     if not args.skip_llm_check:

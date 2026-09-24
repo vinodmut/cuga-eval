@@ -1,9 +1,9 @@
 """Pin how the external agent adapters reach AppWorld tools against how CUGA does.
 
-A comparison between CUGA and another agent is only meaningful if both are
-handed the same toolbox by the same code. These tests assert the parts that
-really are shared, and pin the two places where the paths deliberately differ
-so that a future change to either has to be a conscious one.
+    LangChain adapters share CUGA's tool-provider code. Native Hermes instead
+    reaches the same AppWorld API surface through AppWorld's MCP server. These
+    tests pin the LangChain path; Hermes's separate boundary is tested in
+    ``test_agent_adapters.py``.
 
 Deliberately no registry here: every provider is a stub. These tests are about
 which calls each path makes, not about what a live registry returns.
@@ -86,13 +86,13 @@ async def test_sdk_path_builds_tools_through_combined_tool_provider(monkeypatch)
     assert agent["tool_provider"] is provider
 
 
-async def test_sdk_loads_all_apps_and_external_loads_only_the_task_apps(monkeypatch):
+async def test_sdk_loads_all_apps_and_langchain_adapters_load_only_task_apps(monkeypatch):
     """The one real asymmetry in the toolbox, pinned.
 
     CUGA gets every app and has to locate the right tools itself (that is what
-    `find_tools` is for). The external adapters get a provider already filtered
-    to the apps the task declares, so tool selection across apps is solved for
-    them before the agent runs.
+    `find_tools` is for). The LangChain external adapters get a provider already
+    filtered to the apps the task declares. Native Hermes is deliberately not
+    represented here: its all-app discovery happens through native MCP.
 
     That is not a bug — a plain tool loop cannot hold every app's tools in its
     prompt — but it is a head start CUGA does not get, and any score comparison

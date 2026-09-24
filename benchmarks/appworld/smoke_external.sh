@@ -1,10 +1,10 @@
 #!/bin/bash
-# Smoke-test external agents against configured LLM (no CUGA, no AppWorld servers).
+# Smoke-test in-process external agents against the configured LLM.
 #
 # Usage:
 #   ./smoke_external.sh
-#   ./smoke_external.sh --agents deepagents,hermes
-#   ./smoke_external.sh --native-sdk   # try OpenClaw/Hermes native clients
+#   ./smoke_external.sh --agents stub,deepagents
+#   ./smoke_external.sh --native-sdk   # try an OpenClaw native client
 #
 # Set in .env (repo root):
 #   AGENT_SETTING_CONFIG=settings.openai.toml

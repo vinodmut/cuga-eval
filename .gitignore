@@ -50,6 +50,8 @@ milvus*
 
 # Benchmark-specific data
 benchmarks/appworld/appworld
+benchmarks/appworld/hermes-agent/
+benchmarks/appworld/.hermes/
 /appworld/
 # tau2-bench editable clone (added locally by setup_tau2.sh; never committed)
 benchmarks/tau2/tau2-bench

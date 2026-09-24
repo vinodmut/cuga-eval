@@ -1,6 +1,7 @@
-"""AppWorld evaluation for external agents (Deep Agents, OpenClaw, Hermes).
+"""AppWorld evaluation for external agents.
 
-Reuses CombinedToolProvider LangChain tools and the same AppWorld harness as the SDK path.
+LangChain adapters reuse ``CombinedToolProvider``. Native Hermes instead uses
+AppWorld's MCP server while retaining this module's task setup and scoring path.
 """
 
 import sys
@@ -97,6 +98,7 @@ class AppWorldExternalEvaluator:
         eval_key: Optional[str] = None,
         from_dataset: bool = False,
         max_steps: int = 12,
+        hermes_max_turns: int = 25,
     ):
         normalized = agent_name.strip().lower()
         if normalized not in EXTERNAL_AGENT_NAMES:
@@ -110,6 +112,7 @@ class AppWorldExternalEvaluator:
         self.eval_key = eval_key
         self.from_dataset = from_dataset
         self.max_steps = max_steps
+        self.hermes_max_turns = hermes_max_turns
         self.experiment_name = experiment_name or os.getenv(
             f"APPWORLD_{normalized.upper()}_EXPERIMENT_NAME",
             f"appworld_{normalized}_evaluation",
@@ -124,13 +127,18 @@ class AppWorldExternalEvaluator:
 
     async def setup(self):
         self.langfuse_handler = setup_langfuse()
-        logger.info(f"External agent {self.agent_name!r} ready (task-scoped tools loaded per task)")
+        if self.agent_name == "hermes":
+            logger.info("Native Hermes ready (all AppWorld apps discovered through MCP)")
+        else:
+            logger.info(f"External agent {self.agent_name!r} ready (task-scoped tools loaded per task)")
 
     def _agent_for_tools(self, tools: list[Any]) -> Any:
-        prefer_eval_llm = self.agent_name in ("openclaw", "hermes")
+        prefer_eval_llm = self.agent_name == "openclaw"
         kwargs: dict[str, Any] = {"max_steps": self.max_steps}
         if prefer_eval_llm:
             kwargs["prefer_eval_llm"] = True
+        if self.agent_name == "hermes":
+            kwargs["max_turns"] = self.hermes_max_turns
         if self.agent_name == "deepagents":
             kwargs["prefer_tool_react"] = os.getenv("APPWORLD_DEEPAGENTS_TOOL_REACT", "").lower() in (
                 "1",
@@ -163,8 +171,14 @@ class AppWorldExternalEvaluator:
                 await authenticate_apps_for_task(world)
                 user_context = build_user_context(world)
 
-                app_names = task_app_names(world)
-                _tool_provider, task_tools = await setup_appworld_tools(app_names=app_names)
+                if self.agent_name == "hermes":
+                    # Native Hermes receives every AppWorld API through the
+                    # standalone MCP server. It does not use CUGA's LangChain
+                    # tool bridge or the task-scoped shortcut.
+                    task_tools = []
+                else:
+                    app_names = task_app_names(world)
+                    _tool_provider, task_tools = await setup_appworld_tools(app_names=app_names)
                 agent = self._agent_for_tools(task_tools)
 
                 merged = await invoke_and_score_appworld_agent(
@@ -349,6 +363,12 @@ async def main():
     )
     parser.add_argument("--experiment-name", default=None, help="Experiment name")
     parser.add_argument("--max-steps", type=int, default=12, help="Max ReAct steps for tool-loop agents")
+    parser.add_argument(
+        "--hermes-max-turns",
+        type=int,
+        default=int(os.getenv("APPWORLD_HERMES_MAX_TURNS", "25")),
+        help="Native Hermes agent turn cap (default: 25, matching the Harbor run)",
+    )
 
     from benchmarks.helpers.logging_args import add_log_level_args, apply_log_level
 
@@ -377,6 +397,7 @@ async def main():
         eval_key=args.eval_key,
         from_dataset=args.from_dataset,
         max_steps=args.max_steps,
+        hermes_max_turns=args.hermes_max_turns,
     )
 
     try:

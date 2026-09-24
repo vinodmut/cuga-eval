@@ -27,6 +27,7 @@ APPWORLD_ENV_FILE="${APPWORLD_DIR}/config/appworld.env"
 APPWORLD_REPO_DIR="${APPWORLD_DIR}/appworld"
 APPWORLD_DATA_DIR="${APPWORLD_REPO_DIR}/data"
 APPWORLD_GIT_URL="https://github.com/StonyBrookNLP/appworld"
+APPWORLD_REVISION="42b5bcf3cd334fee33f0c37c02070a9f5807add5"
 
 if [ ! -d "$APPWORLD_DIR" ]; then
   echo "Error: '$APPWORLD_DIR' directory not found."
@@ -63,6 +64,27 @@ else
   echo "Found existing AppWorld clone at '$APPWORLD_REPO_DIR'."
 fi
 
+# Keep the benchmark runtime identical to the AppWorld revision used by the
+# reference Harbor run. Refuse to overwrite tracked work in an existing clone.
+if [ "$(git -C "$APPWORLD_REPO_DIR" rev-parse HEAD)" != "$APPWORLD_REVISION" ]; then
+  if [ -n "$(git -C "$APPWORLD_REPO_DIR" status --porcelain --untracked-files=no)" ]; then
+    echo "Error: AppWorld has tracked local changes; refusing to switch revisions." >&2
+    exit 1
+  fi
+  if ! git -C "$APPWORLD_REPO_DIR" cat-file -e "${APPWORLD_REVISION}^{commit}" 2>/dev/null; then
+    echo "Fetching pinned AppWorld revision $APPWORLD_REVISION..."
+    git -C "$APPWORLD_REPO_DIR" fetch origin "$APPWORLD_REVISION"
+  fi
+  git -C "$APPWORLD_REPO_DIR" checkout --detach "$APPWORLD_REVISION"
+fi
+
+actual_revision="$(git -C "$APPWORLD_REPO_DIR" rev-parse HEAD)"
+if [ "$actual_revision" != "$APPWORLD_REVISION" ]; then
+  echo "Error: expected AppWorld $APPWORLD_REVISION, found $actual_revision" >&2
+  exit 1
+fi
+echo "Using pinned AppWorld revision $actual_revision."
+
 # Decide whether to redo the data download.
 reinstall_data="yes"
 if [ -d "$APPWORLD_DATA_DIR" ]; then
@@ -78,12 +100,15 @@ fi
 # Step 2: register appworld as an editable dep in the `appworld` group.
 # `uv add` is idempotent: re-running updates the entry in place.
 #
-# --no-workspace: add appworld as a plain editable source under
-#   [tool.uv.sources], NOT as a uv workspace member. As a workspace member,
-#   uv would resolve the upstream's `[all]` extras (which pin ruff==0.8.0)
-#   and collide with this repo's ruff>=0.14.3 dev pin.
+# Older uv releases require --no-workspace to add AppWorld as a plain editable
+# source rather than a workspace member. Newer releases removed that option and
+# use the desired path-source behavior by default.
 echo "Registering AppWorld as an editable dependency (group: appworld)..."
-uv add --editable --no-workspace "$APPWORLD_REPO_DIR" --group appworld
+uv_add_args=(--editable "${APPWORLD_REPO_DIR}[mcp]" --group appworld)
+if uv add --help | grep -q -- "--no-workspace"; then
+  uv_add_args+=(--no-workspace)
+fi
+uv add "${uv_add_args[@]}"
 
 if [ "$reinstall_data" = "no" ]; then
   echo "Skipping data download. AppWorld is installed and ready."
